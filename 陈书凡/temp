@@ -1,1 +1,83 @@
-..
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# @Time    : 2023/6/10 21:31
+import os
+import pymysql
+import requests
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+
+START = 1
+END = 10
+List = []
+Count = 0
+
+options = webdriver.ChromeOptions()
+options.add_argument('--headless')
+browser = webdriver.Chrome(options=options)
+browser.maximize_window()
+url = 'https://liquipedia.net/counterstrike/HLTV/Team_Ranking'
+browser.get(url)  #访问网址
+
+
+
+
+def download2(url, filename):
+    # if os.path.exists(filename):
+    #     print('file exists')
+    #     return
+    r = requests.get(url, stream=True, timeout=60)
+    r.raise_for_status()
+    with open(filename,'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            f.write(chunk)
+            f.flush()
+
+if os.path.exists('image') is False:
+    os.makedirs('image')
+
+
+
+
+#向mysql存储
+def MySQL_connect(picture_id, picture_name, picture_binary_system):
+
+    connection = pymysql.connect(
+        host="localhost",
+        user="root",
+        password="123456",
+        port=3306,
+        database="csgo",
+        charset='utf8')
+
+    sql = 'INSERT INTO csgo_team(id,name,filename) VALUES (%s,%s,%s)'
+    # 获取标记
+    cursor = connection.cursor()
+    connection.select_db("csgo")
+    try:
+        cursor.execute(sql, [picture_id, picture_name, picture_binary_system])
+        connection.commit()
+    except Exception as e:
+        print(str(e))
+        connection.rollback()
+    # 释放内存
+    cursor.close()
+    connection.close()
+
+
+if __name__ == '__main__':
+    img = browser.find_elements(By.XPATH, value='//*[@id="mw-content-text"]/div/div/div/table/tbody/tr/td/span/span/a/img')  #图片的路径
+    for ele in img:
+        target_url = ele.get_attribute("src")
+        print(target_url)
+        img_name = target_url.split('/')[-1]
+        filename = os.path.join('image', img_name[-25:])
+        if not os.path.exists(filename):
+            download2(target_url, filename)
+            List.append(filename)
+            Count += 1
+        else:
+            print('file exists')
+    for i in range(0, Count):
+        print("存储："'%d / %d' % (i + 1, Count))
+        MySQL_connect(1, '图片', List[i])
